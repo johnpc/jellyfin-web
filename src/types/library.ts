@@ -43,6 +43,7 @@ export interface Filters {
     SeriesStatus?: SeriesStatus[];
     StudioIds?: string[];
     Tags?: string[];
+    ChannelGroupIds?: string[];
     PersonKinds?: PersonKind[];
     VideoBasicFilter?: VideoBasicFilter[];
     VideoTypes?: VideoType[];

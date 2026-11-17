@@ -14,12 +14,14 @@ import Badge from '@mui/material/Badge';
 import { styled } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 
+import { useGetChannelGroups } from 'apps/modern/features/libraries/hooks/api/useChannelGroups';
 import { useGetQueryFilters } from 'apps/modern/features/libraries/hooks/api/useQueryFilters';
 import { useGetQueryFiltersLegacy } from 'apps/modern/features/libraries/hooks/api/useQueryFiltersLegacy';
 import { useGetStudios } from 'apps/modern/features/libraries/hooks/api/useStudios';
 import globalize from 'lib/globalize';
 
 import FiltersAudioLanguages from './FiltersAudioLanguages';
+import FiltersChannelGroups from './FiltersChannelGroups';
 import FiltersFeatures from './FiltersFeatures';
 import FiltersGenres from './FiltersGenres';
 import FiltersOfficialRatings from './FiltersOfficialRatings';
@@ -106,6 +108,7 @@ const FilterButton: FC<FilterButtonProps> = ({
     const { data: filtersLegacy } = useGetQueryFiltersLegacy(parentId, itemType);
     const { data: filters } = useGetQueryFilters(parentId, itemType);
     const { data: studios } = useGetStudios(parentId, itemType);
+    const { data: channelGroups } = useGetChannelGroups(viewType === LibraryTab.Channels);
 
     const handleChange =
         (panel: string) =>
@@ -177,6 +180,10 @@ const FilterButton: FC<FilterButtonProps> = ({
 
     const isFiltersPersonKindsEnabled = () => {
         return viewType === LibraryTab.Persons;
+    };
+
+    const isFiltersChannelGroupsEnabled = () => {
+        return viewType === LibraryTab.Channels;
     };
 
     return (
@@ -462,6 +469,30 @@ const FilterButton: FC<FilterButtonProps> = ({
                         <AccordionDetails>
                             <FiltersStudios
                                 studiosOptions={studios}
+                                libraryViewSettings={libraryViewSettings}
+                                setLibraryViewSettings={
+                                    setLibraryViewSettings
+                                }
+                            />
+                        </AccordionDetails>
+                    </Accordion>
+                )}
+                {isFiltersChannelGroupsEnabled() && !!channelGroups?.length && (
+                    <Accordion
+                        expanded={expanded === 'filtersChannelGroups'}
+                        onChange={handleChange('filtersChannelGroups')}
+                    >
+                        <AccordionSummary
+                            aria-controls='filtersChannelGroups-content'
+                            id='filtersChannelGroups-header'
+                        >
+                            <Typography>
+                                {globalize.translate('ChannelGroups')}
+                            </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <FiltersChannelGroups
+                                channelGroupsOptions={channelGroups}
                                 libraryViewSettings={libraryViewSettings}
                                 setLibraryViewSettings={
                                     setLibraryViewSettings

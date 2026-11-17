@@ -35,7 +35,8 @@ import template from './tvguide.template.html';
 
 function showViewSettings(instance) {
     import('./guide-settings').then(({ default: guideSettingsDialog }) => {
-        guideSettingsDialog.show(instance.categoryOptions).then(function () {
+        const apiClient = ServerConnections.getApiClient(instance.options.serverId);
+        guideSettingsDialog.show(instance.categoryOptions, apiClient).then(function () {
             instance.refresh();
         });
     });
@@ -136,7 +137,7 @@ function Guide(options) {
     let items = {};
 
     self.options = options;
-    self.categoryOptions = { categories: [] };
+    self.categoryOptions = { categories: [], channelGroupIds: [] };
 
     // 30 mins
     const cellCurationMinutes = 30;
@@ -272,6 +273,9 @@ function Guide(options) {
                 channelQuery.IsSeries = true;
             }
         }
+
+        const channelGroupIds = self.categoryOptions.channelGroupIds || [];
+        channelQuery.ChannelGroupIds = channelGroupIds.length ? channelGroupIds.join(',') : null;
 
         if (userSettings.get('livetv-channelorder') === 'DatePlayed') {
             channelQuery.SortBy = 'DatePlayed';

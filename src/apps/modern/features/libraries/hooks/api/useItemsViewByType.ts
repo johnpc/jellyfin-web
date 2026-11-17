@@ -136,7 +136,12 @@ const fetchGetItemsViewByType = async (
                         enableImageTypes: [ImageType.Primary]
                     },
                     {
-                        signal: options?.signal
+                        signal: options?.signal,
+                        // channelGroupIds is not in the generated client yet; axios appends
+                        // `params` to the query string the client already built.
+                        params: {
+                            channelGroupIds: libraryViewSettings.Filters?.ChannelGroupIds?.join(',')
+                        }
                     }
                 );
                 break;
