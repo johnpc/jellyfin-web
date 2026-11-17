@@ -169,6 +169,7 @@
     "ChannelResolutionHD": "HD",
     "ChannelResolutionFullHD": "Full HD",
     "ChannelResolutionUHD4K": "UHD (4K)",
+    "ChannelGroups": "Channel groups",
     "ChannelNameOnly": "Channel {0} only",
     "ChannelNumber": "Channel number",
     "Channels": "Channels",

@@ -1,3 +1,4 @@
+import escapeHtml from 'escape-html';
 import dom from '../../utils/dom';
 import dialogHelper from '../dialogHelper/dialogHelper';
 import globalize from '../../lib/globalize';
@@ -57,6 +58,32 @@ function renderFilters(context, result, query) {
     renderOptions(context, '.yearFilters', 'chkYearFilter', merge(result.Years.map(String), query.Years, ','), function (i) {
         const delimeter = ',';
         return (delimeter + (query.Years || '') + delimeter).includes(delimeter + i + delimeter);
+    });
+}
+
+function renderChannelGroups(context, groups, query) {
+    const elem = context.querySelector('.channelGroupFilters');
+    if (!groups.length) {
+        elem.classList.add('hide');
+        return;
+    }
+
+    const selected = (query.ChannelGroupIds || '').split(',');
+    elem.classList.remove('hide');
+    elem.querySelector('.filterOptions').innerHTML = '<div class="checkboxList">' + groups.map(function (group) {
+        const checkedHtml = selected.includes(group.Id) ? 'checked' : '';
+        return '<label>'
+            + `<input is="emby-checkbox" type="checkbox" ${checkedHtml} data-filter="${group.Id}" class="chkChannelGroupFilter"/>`
+            + `<span>${escapeHtml(group.Name)} (${group.ChannelCount})</span>`
+            + '</label>';
+    }).join('') + '</div>';
+}
+
+function loadChannelGroups(context, apiClient, userId, itemQuery) {
+    return apiClient.getJSON(apiClient.getUrl('LiveTv/ChannelGroups', {
+        UserId: userId
+    })).then(function (groups) {
+        renderChannelGroups(context, groups, itemQuery);
     });
 }
 
@@ -443,6 +470,23 @@ class FilterDialog {
                 triggerChange(this);
                 return;
             }
+            const chkChannelGroupFilter = dom.parentWithClass(e.target, 'chkChannelGroupFilter');
+            if (chkChannelGroupFilter) {
+                const filterName = chkChannelGroupFilter.getAttribute('data-filter');
+                let filters = query.ChannelGroupIds || '';
+                const delimiter = ',';
+                filters = filters
+                    .split(delimiter)
+                    .filter((f) => f !== filterName)
+                    .join(delimiter);
+                if (chkChannelGroupFilter.checked) {
+                    filters = filters ? (filters + delimiter + filterName) : filterName;
+                }
+                query.StartIndex = 0;
+                query.ChannelGroupIds = filters;
+                triggerChange(this);
+                return;
+            }
             const chkOfficialRatingFilter = dom.parentWithClass(e.target, 'chkOfficialRatingFilter');
             if (chkOfficialRatingFilter) {
                 const filterName = chkOfficialRatingFilter.getAttribute('data-filter');
@@ -480,6 +524,7 @@ class FilterDialog {
         query.HasTrailer = null;
         query.Tags = null;
         query.Years = '';
+        query.ChannelGroupIds = '';
     }
 
     show() {
@@ -502,6 +547,9 @@ class FilterDialog {
                 dlg.classList.add('dynamicFilterDialog');
                 const apiClient = ServerConnections.getApiClient(this.options.serverId);
                 loadDynamicFilters(dlg, apiClient, apiClient.getCurrentUserId(), this.options.query);
+            } else if (this.options.mode === 'livetvchannels') {
+                const apiClient = ServerConnections.getApiClient(this.options.serverId);
+                loadChannelGroups(dlg, apiClient, apiClient.getCurrentUserId(), this.options.query);
             }
         });
     }
