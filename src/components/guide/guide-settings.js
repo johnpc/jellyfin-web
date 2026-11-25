@@ -1,3 +1,4 @@
+import escapeHtml from 'escape-html';
 import dialogHelper from '../dialogHelper/dialogHelper';
 import globalize from '../../lib/globalize';
 import * as userSettings from '../../scripts/settings/userSettings';
@@ -39,6 +40,39 @@ function loadCategories(context, options) {
 
         chkCategory.checked = !selectedCategories.length || selectedCategories.indexOf(type) !== -1;
     }
+}
+
+function saveChannelGroups(context, options) {
+    const chkGroups = context.querySelectorAll('.chkChannelGroup');
+    const selected = [];
+    for (const chkGroup of chkGroups) {
+        if (chkGroup.checked) {
+            selected.push(chkGroup.getAttribute('data-id'));
+        }
+    }
+
+    // Like categories: none and all both mean "don't filter"
+    options.channelGroupIds = selected.length === chkGroups.length ? [] : selected;
+}
+
+function loadChannelGroups(context, options, apiClient) {
+    return apiClient.getJSON(apiClient.getUrl('LiveTv/ChannelGroups', {
+        UserId: apiClient.getCurrentUserId()
+    })).then(function (groups) {
+        if (!groups.length) {
+            return;
+        }
+
+        const selected = options.channelGroupIds || [];
+        context.querySelector('.channelGroupList').innerHTML = groups.map(function (group) {
+            const checkedHtml = !selected.length || selected.includes(group.Id) ? 'checked' : '';
+            return '<label>'
+                + `<input type="checkbox" is="emby-checkbox" class="chkChannelGroup" data-id="${group.Id}" ${checkedHtml} />`
+                + `<span>${escapeHtml(group.Name)} (${group.ChannelCount})</span>`
+                + '</label>';
+        }).join('');
+        context.querySelector('.channelGroups').classList.remove('hide');
+    });
 }
 
 function save(context) {
@@ -85,7 +119,7 @@ function load(context) {
     }
 }
 
-function showEditor(options) {
+function showEditor(options, apiClient) {
     return new Promise(function (resolve, reject) {
         let settingsChanged = false;
 
@@ -121,6 +155,7 @@ function showEditor(options) {
 
             save(dlg);
             saveCategories(dlg, options);
+            saveChannelGroups(dlg, options);
 
             if (settingsChanged) {
                 resolve();
@@ -139,6 +174,7 @@ function showEditor(options) {
 
         load(dlg);
         loadCategories(dlg, options);
+        loadChannelGroups(dlg, options, apiClient);
         dialogHelper.open(dlg);
     });
 }

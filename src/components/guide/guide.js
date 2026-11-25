@@ -35,7 +35,9 @@ import template from './tvguide.template.html';
 
 function showViewSettings(instance) {
     import('./guide-settings').then(({ default: guideSettingsDialog }) => {
-        guideSettingsDialog.show(instance.categoryOptions).then(function () {
+        const apiClient = ServerConnections.getApiClient(instance.options.serverId);
+        guideSettingsDialog.show(instance.categoryOptions, apiClient).then(function () {
+            instance.renderChannelGroupTabs();
             instance.refresh();
         });
     });
@@ -136,7 +138,7 @@ function Guide(options) {
     let items = {};
 
     self.options = options;
-    self.categoryOptions = { categories: [] };
+    self.categoryOptions = { categories: [], channelGroupIds: [] };
 
     // 30 mins
     const cellCurationMinutes = 30;
@@ -146,6 +148,7 @@ function Guide(options) {
     let currentDate;
     let currentStartIndex = 0;
     let currentChannelLimit = 0;
+    let channelGroups = [];
     let autoRefreshInterval;
     let programCells;
     let lastFocusDirection;
@@ -272,6 +275,9 @@ function Guide(options) {
                 channelQuery.IsSeries = true;
             }
         }
+
+        const channelGroupIds = self.categoryOptions.channelGroupIds || [];
+        channelQuery.ChannelGroupIds = channelGroupIds.length ? channelGroupIds.join(',') : null;
 
         if (userSettings.get('livetv-channelorder') === 'DatePlayed') {
             channelQuery.SortBy = 'DatePlayed';
@@ -806,6 +812,74 @@ function Guide(options) {
         reloadGuide(page, newStartDate, scrollToTimeMs, focusToTimeMs, startTimeOfDayMs, focusProgramOnRender);
     }
 
+    function getSelectedChannelGroupId() {
+        const ids = self.categoryOptions.channelGroupIds || [];
+        if (!ids.length) {
+            return '';
+        }
+        return ids.length === 1 ? ids[0] : null;
+    }
+
+    function getChannelGroupTabHtml(id, name, isActive, tabIndex) {
+        const cssClass = isActive ? 'emby-tab-button guide-date-tab-button emby-tab-button-active' : 'emby-tab-button guide-date-tab-button';
+
+        return '<button is="emby-button" class="' + cssClass + '" data-index="' + tabIndex + '" data-id="' + escapeHtml(id) + '">'
+            + '<div class="emby-button-foreground">' + escapeHtml(name) + '</div>'
+            + '</button>';
+    }
+
+    function renderChannelGroupTabs(context) {
+        const container = context.querySelector('.guideHeaderChannelGroups');
+        if (!channelGroups.length) {
+            container.classList.add('hide');
+            return;
+        }
+
+        // Exactly one group selected highlights its tab; none selected highlights "All channels";
+        // a multi-group selection from the settings dialog highlights nothing.
+        const selectedId = getSelectedChannelGroupId();
+        let html = getChannelGroupTabHtml('', globalize.translate('AllChannels'), selectedId === '', 0);
+        channelGroups.forEach(function (group, i) {
+            html += getChannelGroupTabHtml(group.Id, group.Name, group.Id === selectedId, i + 1);
+        });
+
+        context.querySelector('.guideChannelGroupTabsSlider').innerHTML = html;
+        container.classList.remove('hide');
+        context.querySelector('.guideChannelGroupTabs').refresh();
+    }
+
+    function loadChannelGroups(context) {
+        const apiClient = ServerConnections.getApiClient(options.serverId);
+
+        return apiClient.getJSON(apiClient.getUrl('LiveTv/ChannelGroups', {
+            UserId: apiClient.getCurrentUserId()
+        })).then(function (groups) {
+            channelGroups = groups || [];
+        }, function () {
+            // Server without channel groups
+            channelGroups = [];
+        }).then(function () {
+            renderChannelGroupTabs(context);
+        });
+    }
+
+    function onChannelGroupTabChange(e) {
+        const tabButton = e.target.querySelectorAll('.emby-tab-button')[parseInt(e.detail.selectedTabIndex, 10)];
+        if (!tabButton) {
+            return;
+        }
+
+        const id = tabButton.getAttribute('data-id');
+        if (id === getSelectedChannelGroupId()) {
+            return;
+        }
+
+        self.categoryOptions.channelGroupIds = id ? [id] : [];
+        currentStartIndex = 0;
+        reloadPage(options.element);
+        restartAutoRefresh();
+    }
+
     function getDateTabText(date, isActive, tabIndex) {
         const cssClass = isActive ? 'emby-tab-button guide-date-tab-button emby-tab-button-active' : 'emby-tab-button guide-date-tab-button';
 
@@ -1152,6 +1226,12 @@ function Guide(options) {
         restartAutoRefresh();
     });
 
+    self.renderChannelGroupTabs = function () {
+        renderChannelGroupTabs(guideContext);
+    };
+
+    guideContext.querySelector('.guideChannelGroupTabs').addEventListener('tabchange', onChannelGroupTabChange);
+
     guideContext.querySelector('.guideDateTabs').addEventListener('tabchange', function (e) {
         const allTabButtons = e.target.querySelectorAll('.guide-date-tab-button');
 
@@ -1189,6 +1269,8 @@ function Guide(options) {
     itemShortcuts.on(guideContext);
 
     Events.trigger(self, 'load');
+
+    loadChannelGroups(guideContext);
 
     const _guideApiClient = ServerConnections.getApiClient(options.serverId);
     self._wsUnsubscribers = [
